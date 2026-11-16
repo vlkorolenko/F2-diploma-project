@@ -1,40 +1,38 @@
 # РОЗДІЛ 2. ПРОЄКТУВАННЯ АРХІТЕКТУРИ СИСТЕМИ
 
 ## 2.1. Контекстне та контейнерне моделювання системи (C4 Model: Levels 1–2)
-Архітектурне проєктування системи виконано за індустріальною методологією Саймона Брауна (C4 Model) із застосуванням парадигми Architecture-as-Code у нотації Mermaid.js.
+Архітектурне проєктування системи виконано за індустріальною методологією Саймона Брауна (C4 Model) із застосуванням парадигми Diagrams-as-Code у нотації Mermaid.js.
 
 ### 2.1.1. Рівень 1: Діаграма системного контексту (System Context Diagram)
-Діаграма відображає межі взаємодії гібридного статичного сканера з ключовими користувачами та зовнішніми хмарними сервісами.
+Діаграма першого рівня відображає межі системи, користувачів (Person) та зовнішні взаємодії з корпоративними і хмарними сервісами (System_Ext).
 
 ```mermaid
 C4Context
     title C4 Model Level 1: System Context Diagram
 
-    Person(developer, "Software Engineer", "Розробник Java-додатків, автор вихідного коду")
-    Person(security, "AppSec Auditor", "Інженер з безпеки, відповідальний за тріаж вразливостей")
+    Person(developer, "Software Engineer", "Розробник Java-додатків")
+    Person(security, "AppSec Auditor", "Аудитор безпеки коду")
 
-    Enterprise_Boundary(b0, "Організаційний контур підприємства") {
-        System(hybridScanner, "Hybrid SAST System", "Гібридна система статичного аудиту коду на основі CPG, Taint-слайсингу та локальних LLM")
-        System_Ext(ollamaService, "Local LLM Inference Engine", "Локальний сервер Ollama/vLLM з відкритою моделлю DeepSeek-Coder")
-    }
+    System(hybridScanner, "Hybrid SAST System", "Гібридний сканер безпеки на базі Spoon CPG та локальної LLM")
 
-    System_Ext(github, "GitHub / GitLab", "Зовнішня система контролю версій вихідного коду")
+    System_Ext(ollamaService, "Local LLM Engine", "Локальний сервер Ollama (DeepSeek-Coder)")
+    System_Ext(github, "GitHub / GitLab", "Зовнішній репозиторій вихідного коду")
 
-    Rel(developer, hybridScanner, "Завантажує ZIP-архів або ініціює аудит", "HTTPS / Web Browser")
-    Rel(security, hybridScanner, "Аналізує звіт про вразливості та затверджує PR", "HTTPS / Web Browser")
-    Rel(hybridScanner, github, "Клонує репозиторій та публікує Pull Request", "HTTPS / REST API v3")
-    Rel(hybridScanner, ollamaService, "Передає нормалізований зріз коду для верифікації", "HTTP / REST JSON (порт 11434)")
+    Rel_D(developer, hybridScanner, "Завантаження коду / Запуск аудиту", "HTTPS / Web")
+    Rel_D(security, hybridScanner, "Тріаж вразливостей та схвалення PR", "HTTPS / Web")
+    Rel_R(hybridScanner, ollamaService, "Перевірка зрізу коду", "HTTP / REST (11434)")
+    Rel_R(hybridScanner, github, "Клонування та створення PR", "HTTPS / REST v3")
 ```
 
-* **Опис вузлів контексту:**
-  * **Hybrid SAST System** — спроєктована система, що реалізує вимоги [SRS-FUN-01](../srs.md#2-functional-requirements) щодо прийому коду та [SRS-NFR-SEC-01](../srs.md#3-non-functional-requirements) щодо повної локальної ізоляції.
-  * **GitHub / GitLab** — зовнішній провайдер коду, куди публікуються верифіковані Pull Request згідно з [SRS-FUN-08](../srs.md#2-functional-requirements).
-  * **Local LLM Inference Engine** — ізольований контейнер локального інференсу, що виключає витік інтелектуальної власності.
+* **Трасування та наскрізні зв'язки (Cross-linking):**
+  * Спроєктована система **Hybrid SAST System** реалізує функціональну вимогу безпеки [[SRS-FUN-01](../srs.md#2-functional-requirements)] щодо прийому вихідного коду через API або ZIP-архіви.
+  * Контейнер **Local LLM Engine** гарантує виконання нефункціональної вимоги конфіденційності [[SRS-NFR-SEC-01](../srs.md#3-non-functional-requirements)] — повне функціонування в On-Premises контурі без витоку даних на сторонні хмарні сервери.
+  * Взаємодія з **GitHub / GitLab** забезпечує автоматизовану генерацію безпечних виправлень згідно з вимогою [[SRS-FUN-08](../srs.md#2-functional-requirements)].
 
 ---
 
 ### 2.1.2. Рівень 2: Діаграма контейнерів (Container Diagram)
-Діаграма другого рівня розкриває внутрішній сервісний розподіл системи на окремо контейнеризовані Docker-модулі.
+Діаграма другого рівня розкриває сервісну декомпозицію системи на окремо контейнеризовані Docker-модулі відповідно до обраного технологічного стеку.
 
 ```mermaid
 C4Container
@@ -42,88 +40,90 @@ C4Container
 
     Person(user, "User / Security Engineer", "Користувач системи")
 
-    Container_Boundary(c0, "Hybrid SAST Platform") {
-        Container(spa, "Web Frontend SPA", "React 18, Vite, Cytoscape.js", "Клієнтський дашборд: завантаження коду, граф атаки, перегляд diff та генерація PR")
-        Container(apiGateway, "API Gateway / Backend Core", "Spring Boot 3, Java 21", "Керування сесіями, автентифікація, оркестрація завдань аудиту")
-        Container(cpgEngine, "CPG & Slicing Engine", "Java 21, Spoon, JGraphT", "Побудова AST/CFG/DFG, міжпроцедурний Taint Analysis та вилучення зрізів")
-        Container(remediationWorker, "AI Remediation Worker", "Java 21, LangChain4j", "Взаємодія з LLM, компіляторна валідація патчів Compiler-in-the-Loop")
-        ContainerDb(postgres, "PostgreSQL Database", "PostgreSQL 16", "Збереження метаданих проєктів, знайдених вразливостей (CWE) та історії аудитів")
-        ContainerDb(redis, "Redis Message Broker", "Redis 7", "Асинхронна черга завдань аналізу та кешування проміжних зрізів коду")
-    }
+    Container(spa, "Web Frontend SPA", "React 18, Vite", "Клієнтський дашборд: граф атаки, diff коду та створення PR")
+    Container(apiGateway, "API Gateway / Backend Core", "Spring Boot 3, Java 21", "Автентифікація, керування сесіями та API")
 
-    Container_Ext(localLlm, "Local LLM Container", "Ollama / DeepSeek-Coder", "Локальний інференс нейромережі")
-    System_Ext(githubExt, "GitHub API", "Зовнішній сервіс Git")
+    Container(cpgEngine, "CPG & Slicing Engine", "Java 21, Spoon, JGraphT", "Побудова AST/CFG/DFG та Taint Slicing")
+    Container(remediationWorker, "AI Remediation Worker", "Java 21, LangChain4j", "Взаємодія з LLM та валідація патчів")
 
-    Rel(user, spa, "Використовує інтерфейс", "HTTPS")
-    Rel(spa, apiGateway, "Виклики REST API", "HTTPS / JSON")
-    Rel(apiGateway, postgres, "Зчитує та зберігає звіти", "JDBC / TCP (порт 5432)")
-    Rel(apiGateway, redis, "Публікує завдання аудиту в чергу", "RESP / TCP (порт 6379)")
-    Rel(redis, cpgEngine, "Вичитує завдання на сканування", "RESP / TCP (порт 6379)")
-    Rel(cpgEngine, redis, "Передає зрізи коду до черги верифікації", "RESP / TCP (порт 6379)")
-    Rel(redis, remediationWorker, "Вичитує зрізи коду", "RESP / TCP (порт 6379)")
-    Rel(remediationWorker, localLlm, "Запити на верифікацію та генерацію патчу", "HTTP / REST (порт 11434)")
-    Rel(remediationWorker, githubExt, "Створює Pull Request із виправленням", "HTTPS / REST API")
+    ContainerDb(postgres, "PostgreSQL DB", "PostgreSQL 16", "Збереження звітів, метаданих та CWE")
+    ContainerDb(redis, "Redis Broker", "Redis 7", "Черги завдань аудиту та кеш зрізів")
+
+    Container_Ext(localLlm, "Local LLM Container", "Ollama", "Локальний нейромережевий інференс")
+    System_Ext(githubExt, "GitHub API", "REST v3", "Зовнішній Git-провайдер")
+
+    Rel_D(user, spa, "Перегляд звітів та графа", "HTTPS")
+    Rel_D(spa, apiGateway, "REST API виклики", "HTTPS / JSON")
+
+    Rel_D(apiGateway, postgres, "Метадані та історія", "JDBC / TCP (5432)")
+    Rel_R(apiGateway, redis, "Публікація задач", "RESP / TCP (6379)")
+
+    Rel_D(redis, cpgEngine, "Отримання задач", "RESP / TCP")
+    Rel_R(cpgEngine, redis, "Збереження зрізів", "RESP / TCP")
+
+    Rel_U(redis, remediationWorker, "Вичитка зрізів коду", "RESP / TCP")
+    Rel_R(remediationWorker, localLlm, "Верифікація патчу", "HTTP / REST (11434)")
+    Rel_R(remediationWorker, githubExt, "Публікація PR", "HTTPS / REST")
 ```
 
-* **Трасування контейнерів:**
-  * Контейнер **CPG & Slicing Engine** базується на інженерному рішенні [ADR-001](./adr/0001-choice-of-technology.md) щодо використання бібліотек Spoon та JGraphT.
-  * Контейнер **AI Remediation Worker** забезпечує виконання вимоги [SRS-FUN-06](../srs.md#2-functional-requirements) та реалізує пісочницю компіляції [SRS-FUN-07](../srs.md#2-functional-requirements).
-  * Контейнер **Redis Message Broker** забезпечує відмовостійкість та асинхронність за вимогою [SRS-NFR-REL-01](../srs.md#3-non-functional-requirements).
+* **Трасування та інженерні протоколи:**
+  * Контейнер **CPG & Slicing Engine** базується на затвердженому інженерному рішенні [[ADR-001](./adr/0001-choice-of-technology.md)] щодо використання бібліотек Spoon та JGraphT для розбору коду та побудови графа CPG.
+  * Контейнер **AI Remediation Worker** реалізує автоматичний синтез виправлень [[SRS-FUN-06](../srs.md#2-functional-requirements)] та пісочницю компілятора [[SRS-FUN-07](../srs.md#2-functional-requirements)].
+  * Брокер **Redis Broker** гарантує високу продуктивність за вимогою [[SRS-NFR-PERF-02](../srs.md#3-non-functional-requirements)] та надійність із Dead Letter Queue згідно з [[SRS-NFR-REL-01](../srs.md#3-non-functional-requirements)].
 
 ---
 
 ## 2.2. Компонентне моделювання критичного сервісу (C4 Model Level 3: Component)
-Для деталізованого проєктування третього рівня обрано найбільш інтелектуально складний та обчислювальний контейнер — **CPG & Slicing Engine** (ядро компіляторного аналізу та формування зрізів коду). Проєктування здійснено відповідно до принципів Clean Architecture та SOLID.
+Для деталізації на компонентному рівні обрано найскладніше ядро системи — бекенд-контейнер **CPG & Slicing Engine**. Архітектуру структуровано за патерном Clean Architecture з чітким розмежуванням обов'язків (Separation of Concerns).
 
 ```mermaid
 C4Component
     title C4 Model Level 3: Component Diagram (CPG & Slicing Engine)
 
-    Container(redisBroker, "Redis Task Queue", "Redis 7", "Черга вхідних завдань сканування")
-    Container(remediationQueue, "Redis Slice Queue", "Redis 7", "Черга передачі зрізів у ШІ-воркер")
+    Container(redisBroker, "Redis Task Queue", "Redis 7", "Черга завдань аналізу")
+    Container(sliceQueue, "Redis Slice Queue", "Redis 7", "Черга зрізів для ШІ")
 
-    Container_Boundary(engineBoundary, "CPG & Slicing Engine (Clean Architecture)") {
-        Component(inboundConsumer, "AnalysisTaskConsumer", "Spring AMQP / Redis Listener", "Вхідний адаптер: зчитує повідомлення на аудит репозиторію")
-        Component(inputValidator, "TaskPayloadValidator", "Spring Validation", "Валідує коректність структури запиту та наявність прав доступу")
-        Component(errorHandler, "GlobalAnalysisErrorHandler", "Spring Exception Handler", "Перехоплює винятки парсингу, скеровує помилки в DLQ")
+    Container_Boundary(engineBoundary, "CPG & Slicing Engine") {
+        Component(inboundConsumer, "AnalysisTaskConsumer", "Spring AMQP", "Вхідний консюмер завдань")
+        Component(inputValidator, "TaskPayloadValidator", "Validation", "Валідація вхідних даних")
+        Component(errorHandler, "GlobalErrorHandler", "Exception Handler", "Централізований перехоплювач збоїв")
 
-        Component(coordinator, "AnalysisWorkflowCoordinator", "Application Service", "Координує послідовність етапів: парсинг -> CPG -> Taint -> Slicing")
+        Component(coordinator, "WorkflowCoordinator", "App Service", "Оркестрація пайплайну аналізу")
 
-        Component(astBuilder, "SpoonAstModelBuilder", "Domain Service", "Розбирає код на базі Spoon JDT, генерує семантичну AST-модель")
-        Component(cfgBuilder, "ControlFlowGraphBuilder", "Domain Service", "Будує внутрішньопроцедурний граф потоку керування (CFG)")
-        Component(dfgBuilder, "DataFlowGraphBuilder", "Domain Service", "Будує ланцюжки залежності даних (Def-Use Chains, DFG)")
-        Component(cpgIntegrator, "CodePropertyGraphIntegrator", "Domain Service", "Об'єднує AST, CFG та DFG в єдиний мультиграф JGraphT")
-        Component(taintAnalyzer, "InterproceduralTaintAnalyzer", "Domain Service", "Трасує шлях від Source до Sink за правилами CWE")
-        Component(slicer, "ContextualProgramSlicer", "Domain Service", "Вирізає мінімальний залежний зріз коду (15-30 рядків)")
+        Component(astBuilder, "SpoonAstModelBuilder", "Domain Service", "Побудова AST через Eclipse JDT")
+        Component(cfgBuilder, "ControlFlowGraphBuilder", "Domain Service", "Генерація графа переходів CFG")
+        Component(dfgBuilder, "DataFlowGraphBuilder", "Domain Service", "Генерація зв'язків змінних DFG")
+        Component(cpgIntegrator, "CpgIntegrator", "Domain Service", "Синтез мультиграфа CPG на JGraphT")
+        Component(taintAnalyzer, "TaintAnalyzer", "Domain Service", "Трасування від Source до Sink")
+        Component(slicer, "ContextProgramSlicer", "Domain Service", "Вилучення зрізу на 15-30 рядків")
 
-        Component(outboundPublisher, "SlicePayloadPublisher", "Outbound Infrastructure Adapter", "Серіалізує зріз коду та публікує в Redis для AI Worker")
+        Component(outboundPublisher, "SlicePublisher", "Outbound Adapter", "Публікація зрізу в чергу")
     }
 
-    Rel(redisBroker, inboundConsumer, "Отримує повідомлення на сканування", "RESP / TCP")
-    Rel(inboundConsumer, inputValidator, "Передає сирий payload на валідацію", "Internal Java Call")
-    Rel(inputValidator, coordinator, "Ініціює пайплайн аналізу", "Method Call")
-    Rel(coordinator, errorHandler, "Реєструє обробники аварійних ситуацій", "Exception Handling")
+    Rel_D(redisBroker, inboundConsumer, "Завдання на аудит", "RESP")
+    Rel_R(inboundConsumer, inputValidator, "Валідація DTO", "Java Call")
+    Rel_D(inputValidator, coordinator, "Старт аналізу", "Method Call")
+    Rel_R(coordinator, errorHandler, "Обробка помилок", "Exception Handle")
 
-    Rel(coordinator, astBuilder, "Запитує побудову AST-моделі", "Interface Call / DI")
-    Rel(astBuilder, cfgBuilder, "Передає AST-дерева методів", "Java Objects")
-    Rel(astBuilder, dfgBuilder, "Передає таблицю символів та змінні", "Java Objects")
-    Rel(cfgBuilder, cpgIntegrator, "Інтегрує ребра керування", "JGraphT Graph")
-    Rel(dfgBuilder, cpgIntegrator, "Інтегрує ребра даних", "JGraphT Graph")
+    Rel_D(coordinator, astBuilder, "Розбір коду", "Interface Call / DI")
+    Rel_R(astBuilder, cfgBuilder, "Передача AST", "Java Call")
+    Rel_D(astBuilder, dfgBuilder, "Таблиця символів", "Java Call")
+    Rel_R(cfgBuilder, cpgIntegrator, "Ребра CFG", "JGraphT Call")
+    Rel_R(dfgBuilder, cpgIntegrator, "Ребра DFG", "JGraphT Call")
 
-    Rel(coordinator, taintAnalyzer, "Запускає пошук маршрутів зараження", "Method Call")
-    Rel(cpgIntegrator, taintAnalyzer, "Надає CPG-структуру для аналізу", "Graph Traversal")
-    Rel(taintAnalyzer, slicer, "Передає виявлені координати Source-Sink", "Method Call")
-    Rel(slicer, outboundPublisher, "Передає вирізаний зріз коду", "DTO")
-    Rel(outboundPublisher, remediationQueue, "Публікує зріз для LangChain4j", "RESP / TCP")
+    Rel_D(cpgIntegrator, taintAnalyzer, "Готовий CPG", "Graph Traversal")
+    Rel_R(taintAnalyzer, slicer, "Маршрут Taint Path", "Method Call")
+    Rel_D(slicer, outboundPublisher, "Зріз коду", "DTO")
+    Rel_D(outboundPublisher, sliceQueue, "Публікація зрізу", "RESP")
 ```
 
-* **Опис архітектурної дисципліни шарів:**
-  * **Inbound Layer:** Компоненти `AnalysisTaskConsumer`, `TaskPayloadValidator` та `GlobalAnalysisErrorHandler` гарантують валідацію вхідних даних та безпечну обробку винятків згідно з вимогою [SRS-NFR-REL-01](../srs.md#3-non-functional-requirements).
-  * **Domain Layer:** Сервіси `SpoonAstModelBuilder`, `CodePropertyGraphIntegrator` та `InterproceduralTaintAnalyzer` повністю ізольовані від зовнішніх фреймворків і реалізують алгоритмічне ядро системи за рішенням [ADR-001](./adr/0001-choice-of-technology.md).
-  * **Outbound Layer:** Адаптер `SlicePayloadPublisher` відповідає за передачу даних до наступного контейнера через чергу.
+* **Аналіз архітектурної дисципліни шарів (Clean Architecture):**
+  * **Inbound Layer:** Компоненти `AnalysisTaskConsumer`, `TaskPayloadValidator` та `GlobalErrorHandler` ізолюють домен від транспортного протоколу черги та забезпечують відмовостійкість за вимогою [[SRS-NFR-REL-01](../srs.md#3-non-functional-requirements)].
+  * **Domain Core Layer:** Сервіси `SpoonAstModelBuilder`, `ControlFlowGraphBuilder`, `DataFlowGraphBuilder` та `CpgIntegrator` реалізують алгоритмічний розбір коду та базуються на рішенні [[ADR-001](./adr/0001-choice-of-technology.md)].
+  * **Taint & Slicing Services:** Компоненти `TaintAnalyzer` та `ContextProgramSlicer` виконують детерміноване скорочення простору аналізу на 95–98% відповідно до вимоги [[SRS-FUN-05](../srs.md#2-functional-requirements)].
 
 ---
 
-## 2.3. Документування архітектурних рішень (ADR)
-Усі ключові технологічні компроміси зафіксовані в офіційних документах архітектурних рішень у каталозі `docs/adr/`:
-* [ADR-001: Вибір технологічного стеку для синтаксичного розбору, побудови CPG та слайсингу Java-коду](./adr/0001-choice-of-technology.md) — обґрунтування вибору бібліотек Spoon та JGraphT перед альтернативами JavaParser та Joern.
+## 2.3. Документування архітектурних рішень (Architecture Decision Records)
+Усі критичні архітектурні компроміси зафіксовані за міжнародним індустріальним стандартом:
+* [ADR-001: Вибір технологічного стеку для синтаксичного розбору, побудови CPG та слайсингу Java-коду](./adr/0001-choice-of-technology.md) — офіційне рішення у статусі `Approved` (порівняльний аналіз Spoon, JavaParser та Joern).
