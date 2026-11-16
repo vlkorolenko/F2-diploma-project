@@ -15,8 +15,10 @@
 | **Вступ та науковий апарат** | [`docs/0_intro.md`](./0_intro.md) | **Done** | Актуальність, об'єкт, предмет, мета та 7 завдань за ДСТУ 3008:2015 |
 | **Розділ 1. Аналітика та вимоги** | [`docs/1_analysis.md`](./1_analysis.md) | **Done** | Конкурентний аналіз аналогів, моделі As-Is та To-Be |
 | **Монолітний Розділ 1 (.docx)** | [`F2_Diploma_Chapter1_Короленко.docx`](../F2_Diploma_Chapter1_Короленко.docx) | **Done** | Консолідований документ першого розділу (8+ сторінок) |
-| **Розділ 2. Архітектура (C4)** | [`docs/2_design.md`](./2_design.md) | In Progress | Моделі C4 (Context, Container, Component) у Mermaid.js |
-| **Розділ 3. Реалізація** | [`docs/3_implementation.md`](./3_implementation.md) | To Do | Опис структури пакетів та конвеєра збирання |
+| **Специфікація вимог (SRS)** | [`docs/srs.md`](./srs.md) | **Done** | Інженерний контракт вимог за стандартом ISO/IEC/IEEE 29148 |
+| **Розділ 2. Архітектура (C4)** | [`docs/2_design.md`](./2_design.md) | **Done** | Моделі C4 (Context, Container, Component) у Mermaid.js з трасуванням |
+| **Архітектурні рішення (ADR)** | [`docs/adr/0001-choice-of-technology.md`](./adr/0001-choice-of-technology.md) | **Approved** | Затверджене рішення ADR-001 (Spoon + JGraphT vs Joern/JavaParser) |
+| **Розділ 3. Реалізація** | [`docs/3_implementation.md`](./3_implementation.md) | In Progress | Опис структури пакетів та конвеєра збирання |
 | **Висновки** | [`docs/4_conclusions.md`](./4_conclusions.md) | Skeleton | Підсумкові результати проєкту |
 
 ---
@@ -31,3 +33,18 @@
 | **SRS-NFR-ACC-01** | Рівень False Positives | $\le 15\%$ на бенчмарку OWASP Benchmark v1.2 | Еталонний тест-раннер OWASP Scorecard |
 | **SRS-NFR-REL-01** | Відмовостійкість черги | 100% збереження завдань через Redis DLQ | Fault Injection Testing / Testcontainers |
 | **SRS-NFR-INFRA-01**| Споживання оперативної пам'яті | $\le 4$ GB RAM на контейнер аналізатора | Docker Resource Limits / cgroups monitoring |
+
+---
+
+## 3. Інтерактивний календарний план виконання роботи
+
+| № | Етап кваліфікаційного проєкту | Період реалізації | Статус |
+| :-: | :--- | :---: | :---: |
+| 1 | Дослідження предметної області та аналіз літературних джерел | Жовтень 2026 | **Done** |
+| 2 | Формалізація вимог до програмної системи та розробка SRS (ISO 29148) | Листопад 2026 | **Done** |
+| 3 | Архітектурне проєктування системи: моделі C4 (Рівні 1–3) та ADR-001 | Листопад – Грудень 2026 | **Done** |
+| 4 | Розробка алгоритмів побудови Code Property Graph і Taint Slicing | Січень – Лютий 2027 | **In Progress** |
+| 5 | Реалізація ядра статичного аналізу на Spoon та воркера LangChain4j | Лютий – Березень 2027 | **To Do** |
+| 6 | Проєктування SPA Dashboard та автоматизація створення Pull Request | Березень – Квітень 2027 | **To Do** |
+| 7 | Інструментальне тестування та дослідження на OWASP Benchmark v1.2 | Квітень 2027 | **To Do** |
+| 8 | Нормоконтроль, публікація статті та підготовка до захисту | Травень 2027 | **To Do** |

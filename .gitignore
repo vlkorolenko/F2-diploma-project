@@ -1,0 +1,16 @@
+target/
+*.class
+.DS_Store
+*.iml
+.idea/
+.vscode/
+PKM_Workspace/
+Notion_Import/
+*.docx
+PULL_REQUESTS_GUIDE.md
+EXPRESS_PRESENTATION_CHEATSHEET.md
+generate_*.py
+build_*.py
+create_*.py
+complete_*.py
+setup_*.py
