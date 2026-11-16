@@ -16,7 +16,8 @@
 | **Розділ 1. Аналітика та вимоги** | [`docs/1_analysis.md`](./1_analysis.md) | **Done** | Конкурентний аналіз аналогів, моделі As-Is та To-Be |
 | **Монолітний Розділ 1 (.docx)** | [`F2_Diploma_Chapter1_Короленко.docx`](../F2_Diploma_Chapter1_Короленко.docx) | **Done** | Консолідований документ першого розділу (8+ сторінок) |
 | **Специфікація вимог (SRS)** | [`docs/srs.md`](./srs.md) | **Done** | Інженерний контракт вимог за стандартом ISO/IEC/IEEE 29148 |
-| **Розділ 2. Архітектура (C4)** | [`docs/2_design.md`](./2_design.md) | **Done** | Моделі C4 (Context, Container, Component) у Mermaid.js з трасуванням |
+| **Розділ 2. Архітектура (C4, ERD, Алгоритми)** | [`docs/2_design.md`](./2_design.md) | **Done** | C4 Model (L1-L3), ERD PostgreSQL, блок-схеми за ДСТУ |
+| **API Контракт (OpenAPI 3.0)** | [`docs/api/openapi.yaml`](./api/openapi.yaml) | **Done** | Машинозчитуваний міжсервісний контракт OpenAPI 3.0 (YAML) |
 | **Архітектурні рішення (ADR)** | [`docs/adr/0001-choice-of-technology.md`](./adr/0001-choice-of-technology.md) | **Approved** | Затверджене рішення ADR-001 (Spoon + JGraphT vs Joern/JavaParser) |
 | **Розділ 3. Реалізація** | [`docs/3_implementation.md`](./3_implementation.md) | In Progress | Опис структури пакетів та конвеєра збирання |
 | **Висновки** | [`docs/4_conclusions.md`](./4_conclusions.md) | Skeleton | Підсумкові результати проєкту |
@@ -42,7 +43,7 @@
 | :-: | :--- | :---: | :---: |
 | 1 | Дослідження предметної області та аналіз літературних джерел | Жовтень 2026 | **Done** |
 | 2 | Формалізація вимог до програмної системи та розробка SRS (ISO 29148) | Листопад 2026 | **Done** |
-| 3 | Архітектурне проєктування системи: моделі C4 (Рівні 1–3) та ADR-001 | Листопад – Грудень 2026 | **Done** |
+| 3 | Архітектурне проєктування: C4 (L1-L3), ERD, OpenAPI, алгоритми | Листопад – Грудень 2026 | **Done** |
 | 4 | Розробка алгоритмів побудови Code Property Graph і Taint Slicing | Січень – Лютий 2027 | **In Progress** |
 | 5 | Реалізація ядра статичного аналізу на Spoon та воркера LangChain4j | Лютий – Березень 2027 | **To Do** |
 | 6 | Проєктування SPA Dashboard та автоматизація створення Pull Request | Березень – Квітень 2027 | **To Do** |

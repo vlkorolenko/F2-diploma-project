@@ -1,0 +1,434 @@
+openapi: 3.0.3
+info:
+  title: Hybrid SAST Security Audit Engine API
+  description: >
+    Індустріальний міжсервісний REST API контракт для гібридної системи статичного
+    аудиту безпеки Java-проєктів на основі Code Property Graph (CPG), Taint Analysis
+    та локальних LLM. Забезпечує завантаження коду, асинхронний запуск аналізу,
+    отримання звітів та автоматизовану генерацію безпечних Pull Request.
+  version: 1.0.0
+  contact:
+    name: Владислав Короленко
+    email: korolenko.vlad@chnu.edu.ua
+
+servers:
+  - url: https://api.sast-hybrid.local/api/v1
+    description: Внутрішній корпоративний On-Premises API шлюз
+  - url: http://localhost:8080/api/v1
+    description: Локальне середовище розробки та тестування
+
+security:
+  - BearerAuth: []
+
+paths:
+  /audits/upload:
+    post:
+      summary: Завантаження вихідного коду для аудиту (ZIP-архів або посилання на Git)
+      operationId: uploadRepository
+      tags:
+        - Ingestion
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - source_type
+              properties:
+                source_type:
+                  type: string
+                  enum: [ARCHIVE_ZIP, GIT_URL]
+                  description: Джерело вихідного коду
+                git_url:
+                  type: string
+                  format: uri
+                  example: "https://github.com/spring-projects/spring-petclinic.git"
+                  description: URL віддаленого Git-репозиторію
+                branch:
+                  type: string
+                  default: "main"
+                  example: "main"
+                  description: Назва гілки для аудиту
+                archive_file:
+                  type: string
+                  format: binary
+                  description: Двійковий ZIP-архів Java-проєкту (до 100 МБ)
+      responses:
+        '201':
+          description: Репозиторій успішно зареєстровано та ініціалізовано сесію
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '413':
+          description: Розмір завантаженого архіву перевищує 100 МБ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /audits/{session_id}/analyze:
+    post:
+      summary: Асинхронний запуск компіляторного аналізу CPG та пошуку вразливостей
+      operationId: startAnalysis
+      tags:
+        - Analysis
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Унікальний ідентифікатор сесії аудиту
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisConfigRequest'
+      responses:
+        '202':
+          description: Завдання успішно поставлено в чергу обробки Redis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskQueuedResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          description: Сесія аудиту вже перебуває в процесі аналізу
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /audits/{session_id}/findings:
+    get:
+      summary: Отримання верифікованих вразливостей та кодових зрізів сесії
+      operationId: getAuditFindings
+      tags:
+        - Findings
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: severity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [NEW, CONFIRMED, FALSE_POSITIVE, REMEDIATED]
+      responses:
+        '200':
+          description: Список знайдених вразливостей із Taint-маршрутами
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    format: uuid
+                  total_findings:
+                    type: integer
+                    example: 3
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/FindingDetail'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /audits/{session_id}/findings/{finding_id}/remediate:
+    post:
+      summary: Генерація безпечного патчу мовною моделлю та публікація Pull Request
+      operationId: applyRemediation
+      tags:
+        - Remediation
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: finding_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - target_branch
+              properties:
+                target_branch:
+                  type: string
+                  example: "main"
+                git_access_token:
+                  type: string
+                  format: password
+                  description: Personal Access Token для авторизації в GitHub API
+      responses:
+        '200':
+          description: Патч скомпільовано, верифіковано та опубліковано у Pull Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemediationResult'
+        '400':
+          description: Згенерований патч не пройшов компіляцію в системній пісочниці
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompilerFailureResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '429':
+          $ref: '#/components/responses/TooManyRequestsError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Автентифікація через підписаний JWT токен у заголовку Authorization
+
+  schemas:
+    AuditSessionResponse:
+      type: object
+      required:
+        - session_id
+        - repository_id
+        - status
+        - created_at
+      properties:
+        session_id:
+          type: string
+          format: uuid
+          example: "a4f89d34-71e2-482a-bc92-1e9a912c0199"
+        repository_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [QUEUED, ANALYZING, COMPLETED, FAILED]
+          example: "QUEUED"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-11-16T18:30:00Z"
+
+    AnalysisConfigRequest:
+      type: object
+      properties:
+        max_slice_depth:
+          type: integer
+          minimum: 5
+          maximum: 50
+          default: 20
+          description: Максимальна глибина обходу ребер Taint Path
+        enable_ai_verification:
+          type: boolean
+          default: true
+        rule_categories:
+          type: array
+          items:
+            type: string
+            enum: [CWE-89, CWE-79, CWE-78, CWE-22]
+
+    TaskQueuedResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        session_id:
+          type: string
+          format: uuid
+        queue_name:
+          type: string
+          example: "cpg-analysis-tasks"
+        status:
+          type: string
+          example: "ANALYZING"
+        estimated_duration_sec:
+          type: integer
+          example: 35
+
+    FindingDetail:
+      type: object
+      required:
+        - finding_id
+        - cwe_code
+        - severity
+        - file_path
+        - line_number
+        - code_slice
+      properties:
+        finding_id:
+          type: string
+          format: uuid
+        cwe_code:
+          type: string
+          example: "CWE-89"
+        vulnerability_title:
+          type: string
+          example: "SQL Injection via Unsanitized HTTP Parameter"
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+          example: "HIGH"
+        status:
+          type: string
+          enum: [NEW, CONFIRMED, FALSE_POSITIVE, REMEDIATED]
+          example: "CONFIRMED"
+        file_path:
+          type: string
+          example: "src/main/java/ua/edu/chnu/controller/UserController.java"
+        line_number:
+          type: integer
+          example: 42
+        code_slice:
+          type: string
+          description: Нормалізований кодовий зріз (15-30 рядків)
+        taint_path:
+          $ref: '#/components/schemas/TaintPathInfo'
+
+    TaintPathInfo:
+      type: object
+      properties:
+        source_element:
+          type: string
+          example: "request.getParameter(\"id\")"
+        sink_element:
+          type: string
+          example: "statement.executeQuery(query)"
+        intermediate_nodes_count:
+          type: integer
+          example: 4
+
+    RemediationResult:
+      type: object
+      required:
+        - patch_id
+        - pull_request_url
+        - compilation_verified
+      properties:
+        patch_id:
+          type: string
+          format: uuid
+        pull_request_url:
+          type: string
+          format: uri
+          example: "https://github.com/vlkorolenko/demo-project/pull/4"
+        compilation_verified:
+          type: boolean
+          example: true
+        diff_unified:
+          type: string
+          example: "@@ -42,3 +42,3 @@\n- statement.executeQuery(sql);\n+ PreparedStatement ps = conn.prepareStatement(sql);"
+
+    CompilerFailureResponse:
+      type: object
+      properties:
+        error_code:
+          type: string
+          example: "COMPILATION_ERROR"
+        diagnostic_messages:
+          type: array
+          items:
+            type: string
+          example: ["UserController.java:43: cannot find symbol: class PreparedStatement"]
+
+    ErrorResponse:
+      type: object
+      required:
+        - timestamp
+        - status
+        - error
+        - message
+        - path
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Invalid UUID format or missing required payload"
+        path:
+          type: string
+          example: "/api/v1/audits/upload"
+
+  responses:
+    BadRequestError:
+      description: Помилка валідації вхідних даних (400)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnauthorizedError:
+      description: Відсутній або недійсний JWT токен авторизації (401)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFoundError:
+      description: Запитуваний ресурс не знайдено (404)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequestsError:
+      description: Перевищено ліміт запитів (Rate Limiting 429)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalServerError:
+      description: Внутрішня системна помилка сервера (500)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
